@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Clock, Volume2, BookOpen, Mic2 } from 'lucide-react';
+import { X, Clock, Volume2, BookOpen } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Location } from '../../data/locations';
 
@@ -10,11 +10,21 @@ const STORY_MODES = [
     { id: 'both', icon: '🔀', label: 'Complete', desc: 'The full spectrum of reality' },
 ];
 
-const ERAS = [
-    { id: 'ancient', label: 'Ancient Roots', desc: 'Pre-1800s' },
-    { id: 'industrial', label: 'Industrial', desc: '1800-1950' },
-    { id: 'modern', label: 'Modern Era', desc: '1950-Present' },
-    { id: 'all', label: 'Timeless', desc: 'Full History' },
+const DATE_RANGES = [
+    { id: '1600-1800', label: 'Colonial Era', desc: '1600-1800' },
+    { id: '1800-1900', label: 'British Raj', desc: '1800-1900' },
+    { id: '1900-1947', label: 'Freedom Struggle', desc: '1900-1947' },
+    { id: '1947-1980', label: 'Post-Independence', desc: '1947-1980' },
+    { id: '1980-2000', label: 'Modern Mumbai', desc: '1980-2000' },
+    { id: '2000-2024', label: 'Contemporary', desc: '2000-Present' },
+    { id: 'all', label: 'All Eras', desc: 'Complete Timeline' },
+];
+
+const LANGUAGES = [
+    { id: 'english', label: 'English', flag: '🇬🇧' },
+    { id: 'hindi', label: 'Hindi', flag: '🇮🇳' },
+    { id: 'marathi', label: 'Marathi', flag: '🚩' },
+    { id: 'hinglish', label: 'Hinglish', flag: '🇮🇳🇬🇧' },
 ];
 
 const VOICE_STYLES = [
@@ -33,10 +43,11 @@ interface StoryCustomizerProps {
 export default function StoryCustomizer({ location, onStartStory, onClose }: StoryCustomizerProps) {
     const [preferences, setPreferences] = useState({
         storyMode: 'both',
-        era: 'all',
+        dateRange: 'all',
         voiceStyle: 'dramatic',
+        language: 'hinglish',
         length: 'standard',
-        mode: 'narrate'
+        mode: 'conversation'
     });
 
     return (
@@ -107,41 +118,43 @@ export default function StoryCustomizer({ location, onStartStory, onClose }: Sto
                                 <Clock size={14} /> Time Period
                             </label>
                             <div className="flex flex-wrap gap-2">
-                                {ERAS.map(era => (
+                                {DATE_RANGES.map(range => (
                                     <button
-                                        key={era.id}
-                                        onClick={() => setPreferences(p => ({ ...p, era: era.id }))}
+                                        key={range.id}
+                                        onClick={() => setPreferences(p => ({ ...p, dateRange: range.id }))}
                                         className={cn(
-                                            "px-3 py-2 rounded-lg text-sm border transition-all",
-                                            preferences.era === era.id
+                                            "px-3 py-2 rounded-lg text-xs border transition-all",
+                                            preferences.dateRange === range.id
                                                 ? "bg-purple-500/20 border-purple-500/50 text-white"
                                                 : "bg-white/5 border-transparent text-gray-400 hover:text-white"
                                         )}
                                     >
-                                        {era.label}
+                                        <div className="font-semibold">{range.label}</div>
+                                        <div className="text-[10px] opacity-60">{range.desc}</div>
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Voice */}
+                        {/* Language */}
                         <div className="space-y-3">
                             <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold flex items-center gap-2">
-                                <Mic2 size={14} /> Narrator
+                                🌐 Language
                             </label>
                             <div className="grid grid-cols-2 gap-2">
-                                {VOICE_STYLES.map(voice => (
+                                {LANGUAGES.map(lang => (
                                     <button
-                                        key={voice.id}
-                                        onClick={() => setPreferences(p => ({ ...p, voiceStyle: voice.id }))}
+                                        key={lang.id}
+                                        onClick={() => setPreferences(p => ({ ...p, language: lang.id }))}
                                         className={cn(
-                                            "px-3 py-2 rounded-lg text-sm border transition-all text-left truncate",
-                                            preferences.voiceStyle === voice.id
+                                            "px-3 py-2 rounded-lg text-sm border transition-all flex items-center gap-2",
+                                            preferences.language === lang.id
                                                 ? "bg-cyan-500/20 border-cyan-500/50 text-white"
                                                 : "bg-white/5 border-transparent text-gray-400 hover:text-white"
                                         )}
                                     >
-                                        {voice.label}
+                                        <span className="text-base">{lang.flag}</span>
+                                        {lang.label}
                                     </button>
                                 ))}
                             </div>

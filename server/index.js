@@ -71,17 +71,25 @@ async function reverseGeocode(lat, lng) {
     }
 }
 
-// 3. Perplexity API (Web Search)
-async function searchLocationInfo(locationName, storyMode, era) {
+// 3. Perplexity API (Web Search) - Ultra-Realistic Fact-Based Research
+async function searchLocationInfo(locationName, storyMode, dateRange) {
     if (!process.env.PERPLEXITY_API_KEY) {
         console.warn("Perplexity API Key missing, using fallback.");
-        return `Detailed history of ${locationName} during the ${era} era.`;
+        return `Detailed factual history of ${locationName} during ${dateRange}.`;
     }
 
+    const dateContext = dateRange !== 'all' ? `Focus exclusively on the period ${dateRange}. ` : '';
+
     const prompts = {
-        dark: `Research ${locationName}, Mumbai crime history, ghost stories, mafia, scandals, tragedies. ${era !== 'all' ? `Focus on ${era} era.` : ''} Include specific names, dates, incidents.`,
-        bright: `Research ${locationName}, Mumbai history, achievements, heritage, famous personalities, development. ${era !== 'all' ? `Focus on ${era} era.` : ''} Include specific facts and dates.`,
-        both: `Research ${locationName}, Mumbai - both dark (crime, ghosts, scandals) and bright (history, achievements, heritage) aspects. ${era !== 'all' ? `Focus on ${era} era.` : ''} Cover both equally.`,
+        dark: `Research ${locationName}, Mumbai - ONLY VERIFIED FACTS about: crimes, murders, gang wars, mafia activities, scandals, tragedies, ghost stories, accidents, riots, corruption cases. ${dateContext}Include: specific names of criminals/victims, exact dates, police case numbers if available, newspaper references, death tolls, locations of incidents. NO speculation or fiction. Cite sources.`,
+
+        bright: `Research ${locationName}, Mumbai - ONLY VERIFIED FACTS about: historical achievements, cultural landmarks, famous personalities who lived/worked there, architectural heritage, independence movement activities, social reforms, economic development, festivals, art movements. ${dateContext}Include: specific names, exact dates, building names, achievement details, awards, historical significance. NO speculation. Cite sources.`,
+
+        both: `Research ${locationName}, Mumbai - COMPREHENSIVE FACTUAL HISTORY covering BOTH:
+        1. DARK SIDE: Verified crimes, tragedies, scandals, riots, accidents with specific names, dates, case details
+        2. BRIGHT SIDE: Verified achievements, heritage, famous residents, cultural significance, development milestones
+        ${dateContext}
+        For EACH fact: provide specific names, exact dates, locations, and source references. Balance both aspects equally. NO fiction or speculation. Only documented historical facts.`,
     };
 
     try {
@@ -93,15 +101,22 @@ async function searchLocationInfo(locationName, storyMode, era) {
             },
             body: JSON.stringify({
                 model: 'llama-3.1-sonar-large-128k-online',
-                messages: [{ role: 'user', content: prompts[storyMode] || prompts.both }],
-                max_tokens: 2500,
+                messages: [{
+                    role: 'system',
+                    content: 'You are a historical researcher. Provide ONLY verified, factual information with specific dates, names, and sources. No speculation or creative writing.'
+                }, {
+                    role: 'user',
+                    content: prompts[storyMode] || prompts.both
+                }],
+                max_tokens: 3000,
+                temperature: 0.2, // Low temperature for factual accuracy
             }),
         });
         const data = await response.json();
         return data.choices?.[0]?.message?.content || '';
     } catch (error) {
         console.error('Perplexity API error:', error);
-        return `History and stories of ${locationName}.`;
+        return `Factual history and documented events of ${locationName}.`;
     }
 }
 
@@ -112,24 +127,48 @@ async function generateWithClaude(scrapedContent, pois, areaInfo, preferences) {
         return `Welcome to ${areaInfo.neighborhood}! This is a simulated script because the API key is missing. Imagine a dramatic story about ${pois.map(p => p.name).join(', ')}.`;
     }
 
-    const { storyMode, era, voiceStyle, length, language } = preferences;
+    const { storyMode, dateRange, voiceStyle, length, language } = preferences;
 
-    const systemPrompt = `You are "KAHAANI" - Mumbai's master storyteller.
-    Style: ${voiceStyle}
-    Language: ${language}
-    Mode: ${storyMode}
-    Length: ${length}
-    Era: ${era}
-    
-    RULES:
-    1. Write ONLY narration.
-    2. Start with a hook.
-    3. Use provided research.
-    4. Speak naturally.`;
+    const languageInstructions = {
+        english: 'Write in pure English.',
+        hindi: 'Write in pure Hindi (Devanagari script).',
+        marathi: 'Write in pure Marathi (Devanagari script).',
+        hinglish: 'Write in Hinglish - natural mix of Hindi and English as spoken in Mumbai.'
+    };
 
-    const userPrompt = `Create a story about ${areaInfo.neighborhood}.
-    POIs: ${pois.map(p => p.name).join(', ')}
-    Research: ${scrapedContent}`;
+    const voiceCharacteristics = {
+        dramatic: 'Deep, resonant Indian voice with theatrical pauses. Heavy bass tone.',
+        friendly: 'Warm, conversational Mumbai local voice. Like a friend sharing stories.',
+        documentary: 'Authoritative Indian narrator voice. Clear, precise, factual delivery.',
+        mysterious: 'Low, whispered Indian voice with suspenseful pauses.'
+    };
+
+    const systemPrompt = `You are "KAHAANI" - Mumbai's master storyteller with a deep, heavy-bass Indian voice.
+
+VOICE: ${voiceCharacteristics[voiceStyle]}
+LANGUAGE: ${languageInstructions[language]}
+MODE: ${storyMode === 'dark' ? 'Dark/Mysterious' : storyMode === 'bright' ? 'Inspiring' : 'Balanced'}
+TIME: ${dateRange}
+
+RULES:
+1. Use ONLY verified facts from research
+2. Include specific names, dates, locations
+3. NO fiction - only documented facts
+4. Start with powerful hook
+5. Use vivid Mumbai sensory details
+6. Build emotional connection
+7. Write for SPOKEN narration
+8. Add Hinglish expressions if language is hinglish`;
+
+    const userPrompt = `Create ultra-realistic narration about ${areaInfo.neighborhood}, Mumbai.
+
+TIME PERIOD: ${dateRange}
+POIs: ${pois.map(p => p.name).join(', ')}
+
+VERIFIED RESEARCH:
+${scrapedContent}
+
+Use ONLY facts above. Include names and dates. Make it powerful for heavy Indian voice.`;
 
     try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -140,8 +179,9 @@ async function generateWithClaude(scrapedContent, pois, areaInfo, preferences) {
                 'content-type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'claude-3-5-sonnet-20241022', // Latest Claude 3.5 Sonnet (Oct 2024)
-                max_tokens: 2500,
+                model: 'claude-sonnet-4-5-20250929',
+                max_tokens: 3000,
+                temperature: 0.7,
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userPrompt }],
             }),
@@ -165,7 +205,7 @@ async function generateWithClaude(scrapedContent, pois, areaInfo, preferences) {
 
 app.post('/api/gather-data', async (req, res) => {
     try {
-        const { lat, lng, locationName, storyMode, era } = req.body;
+        const { lat, lng, locationName, storyMode, dateRange } = req.body;
         console.log(`Gathering data for ${locationName}...`);
 
         const [pois, areaInfo, reverseGeo] = await Promise.all([
@@ -178,7 +218,7 @@ app.post('/api/gather-data', async (req, res) => {
         // Refine location name if needed
         const refinedName = areaInfo.neighborhood || locationName;
 
-        const scrapedContent = await searchLocationInfo(refinedName, storyMode, era);
+        const scrapedContent = await searchLocationInfo(refinedName, storyMode, dateRange);
 
         res.json({
             pois,

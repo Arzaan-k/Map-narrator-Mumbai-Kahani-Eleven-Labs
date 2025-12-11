@@ -12,7 +12,7 @@ export async function gatherData(location: any, preferences: any) {
             lng: location.lng,
             locationName: location.name,
             storyMode: preferences.storyMode,
-            era: preferences.era,
+            dateRange: preferences.dateRange,
         }),
     });
 
