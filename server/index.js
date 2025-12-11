@@ -54,7 +54,20 @@ async function findPOIsInRadius(lat, lng, radius = 2000) {
             body: `data=${encodeURIComponent(query)}`,
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
+
+        // Check if response is JSON (Overpass sometimes returns XML errors)
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.warn('Overpass API returned non-JSON response, using fallback');
+            return [{ name: 'Historical Sites', type: 'landmark' }];
+        }
+
         const data = await response.json();
+
+        if (!data.elements || data.elements.length === 0) {
+            return [{ name: 'Local landmarks', type: 'landmark' }];
+        }
+
         return data.elements
             .filter(el => el.tags && el.tags.name)
             .slice(0, 15)
@@ -63,8 +76,8 @@ async function findPOIsInRadius(lat, lng, radius = 2000) {
                 type: el.tags.historic || el.tags.amenity || el.tags.tourism || 'landmark',
             }));
     } catch (error) {
-        console.error('Overpass API error:', error);
-        return [];
+        console.error('Overpass API error:', error.message);
+        return [{ name: 'Mumbai landmarks', type: 'landmark' }];
     }
 }
 
@@ -318,6 +331,62 @@ app.get('/api/elevenlabs/signed-url', async (req, res) => {
     } catch (error) {
         console.error('Signed URL error:', error);
         res.status(500).json({ error: 'Failed to generate signed URL' });
+    }
+});
+
+// ElevenLabs TTS - Generate audio from text
+app.post('/api/elevenlabs/tts', async (req, res) => {
+    try {
+        const { text } = req.body;
+
+        if (!text) {
+            return res.status(400).json({ error: 'Text is required' });
+        }
+
+        const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || process.env.VITE_ELEVENLABS_API_KEY;
+
+        if (!ELEVENLABS_API_KEY) {
+            return res.status(500).json({ error: 'Missing ElevenLabs API key' });
+        }
+
+        console.log('🎙️ Generating TTS audio...');
+        console.log('📝 Text length:', text.length, 'characters');
+
+        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB', {
+            method: 'POST',
+            headers: {
+                'Accept': 'audio/mpeg',
+                'Content-Type': 'application/json',
+                'xi-api-key': ELEVENLABS_API_KEY
+            },
+            body: JSON.stringify({
+                text: text,
+                model_id: 'eleven_multilingual_v2',
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.75,
+                    style: 0.0,
+                    use_speaker_boost: true
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ ElevenLabs TTS error:', errorText);
+            return res.status(response.status).json({ error: 'TTS generation failed', details: errorText });
+        }
+
+        const audioBuffer = await response.arrayBuffer();
+        console.log('✓ Audio generated:', audioBuffer.byteLength, 'bytes');
+
+        // Send audio directly
+        res.set('Content-Type', 'audio/mpeg');
+        res.send(Buffer.from(audioBuffer));
+
+    } catch (error) {
+        console.error('TTS error:', error);
+        res.status(500).json({ error: 'Failed to generate audio' });
     }
 });
 
