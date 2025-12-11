@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useConversation } from '@11labs/react';
 import { useUser } from '@clerk/clerk-react';
 import Visualizer from './Visualizer';
 import { motion } from 'framer-motion';
-import { X, BookmarkPlus, BookmarkCheck } from 'lucide-react';
+import { X, Send, Mic, MicOff, BookmarkPlus, Volume2, VolumeX } from 'lucide-react';
 
 interface StoryPlayerProps {
     location: any;
@@ -12,292 +12,161 @@ interface StoryPlayerProps {
 }
 
 export default function StoryPlayer({ location, storyData, onClose }: StoryPlayerProps) {
+    const { user } = useUser();
     const [transcript, setTranscript] = useState<string>('');
-    const [phase, setPhase] = useState<'connecting' | 'narrating' | 'conversing' | 'ended'>('connecting');
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [phase, setPhase] = useState<'connecting' | 'live' | 'ended'>('connecting');
+    const [textInput, setTextInput] = useState('');
+    const [isMuted, setIsMuted] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
+    const [volume, setVolume] = useState(0.8);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    const hasStartedConversation = useRef(false);
+    const hasStarted = useRef(false);
 
-    // Check if we're in conversation mode or podcast mode
-    const isConversationMode = storyData.preferences?.mode === 'conversation';
+    // Build dynamic prompt
+    const agentPrompt = `You are "KAHAANI" - Mumbai's legendary AI storyteller.
 
-    // ElevenLabs Conversational AI hook
+LOCATION: ${location.name}, Mumbai (${location.lat}, ${location.lng})
+COVERAGE: 2km radius from this point
+
+KNOWLEDGE BASE:
+${storyData.scrapedContent || storyData.knowledgeBase || 'Historical information about ' + location.name}
+
+NEARBY PLACES:
+${storyData.pois?.slice(0, 8).map((p: any) => `• ${p.name}`).join('\n') || 'Various landmarks'}
+
+USER PREFERENCES:
+• Style: ${storyData.preferences?.storyMode || 'complete'}
+• Era: ${storyData.preferences?.dateRange || 'all'}
+• Language: ${storyData.preferences?.language || 'english'}
+• Tone: ${storyData.preferences?.voiceStyle || 'dramatic'}
+
+YOUR BEHAVIOR:
+1. Tell continuous, engaging stories about ${location.name}
+2. Be interruptible - answer questions when asked
+3. Use ONLY verified facts from knowledge base
+4. Include specific dates, names, and events
+5. Create vivid imagery of Mumbai
+6. ${storyData.preferences?.language === 'hinglish' ? 'Mix Hindi phrases naturally' : 'Speak clearly'}
+
+RULES:
+❌ No speculation or made-up facts
+❌ No information beyond knowledge base
+✅ Stay factual and engaging
+✅ Reference specific details`;
+
+    // ElevenLabs Conversational AI
     const conversation = useConversation({
+        overrides: {
+            agent: {
+                prompt: { prompt: agentPrompt },
+                firstMessage: `Namaste! Main hoon Kahaani. Welcome to ${location.name}! Let me share some fascinating stories about this place...`,
+                language: storyData.preferences?.language === 'hindi' ? 'hi' : 'en'
+            },
+            tts: {
+                voiceId: 'pNInz6obpgDQGcFmaJgB' // Adam - deep voice
+            }
+        },
         onConnect: () => {
-            console.log('✓ Connected to ElevenLabs Conversational AI');
-            setPhase('conversing');
-            setIsPlaying(true);
+            console.log('✓ Connected to ElevenLabs');
+            setPhase('live');
+            setTranscript(`🎙️ KAHAANI is LIVE\n━━━━━━━━━━━━━━━━━━━\n📍 ${location.name}\n\n`);
         },
         onDisconnect: () => {
-            console.log('Disconnected from ElevenLabs Conversational AI');
-            setIsPlaying(false);
+            console.log('Disconnected');
+            setPhase('ended');
         },
         onMessage: (message: any) => {
-            console.log('Conversation message:', message);
-            // Handle different message formats from ElevenLabs
-            const text = message?.message?.text || message?.text || message?.message || '';
+            const text = message.message || message.text || '';
             if (text) {
-                setTranscript(prev => {
-                    const timestamp = new Date().toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    return prev + `\n\n[${timestamp}] 🎙️ KAHAANI:\n${text}`;
-                });
+                const isUser = message.source === 'user' || message.type === 'user_transcript';
+                setTranscript(prev => prev + `\n\n${isUser ? '👤 You' : '🎙️ KAHAANI'}:\n${text}`);
             }
         },
         onError: (error: any) => {
-            console.error('ElevenLabs conversation error:', error);
-            setTranscript(prev => prev + '\n\n❌ Connection error. Check console for details.');
-        },
+            console.error('Error:', error);
+            setTranscript(prev => prev + `\n\n⚠️ ${error.message || 'Connection issue'}`);
+        }
     });
 
-    // Play the narration using ElevenLabs TTS
-    const playNarration = async () => {
-        try {
-            setPhase('narrating');
-            setIsPlaying(true);
+    const { status, isSpeaking, sendUserMessage } = conversation;
 
-            // Show the script immediately
-            setTranscript(storyData.script);
-
-            const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || 'sk_6b60b2990db40f9ddfab58f56024d756a80c625de9fc62d0';
-
-            // Use multilingual voice for Hindi/Hinglish support
-            const VOICE_ID = "pNInz6obpgDQGcFmaJgB"; // Adam - deep bass, supports multilingual
-
-            console.log('Generating audio with ElevenLabs v3 (alpha) - Multilingual Model...');
-            console.log('Language:', storyData.preferences?.language);
-
-            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'audio/mpeg',
-                    'Content-Type': 'application/json',
-                    'xi-api-key': ELEVENLABS_API_KEY
-                },
-                body: JSON.stringify({
-                    text: storyData.script,
-                    model_id: "eleven_multilingual_v2", // ElevenLabs v3 (alpha) - best for expressions and multilingual
-                    voice_settings: {
-                        stability: 0.5, // Lower for more dynamic expression in v3
-                        similarity_boost: 0.75,
-                        style: 0.0, // v3 handles style automatically
-                        use_speaker_boost: true
-                    },
-                    // Enable multilingual mode for Hindi/Hinglish
-                    language_code: storyData.preferences?.language === 'hindi' ? 'hi' :
-                        storyData.preferences?.language === 'marathi' ? 'mr' :
-                            storyData.preferences?.language === 'hinglish' ? 'hi' : 'en'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`TTS API error: ${response.status}`);
-            }
-
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            // Create and play audio
-            const audio = new Audio(audioUrl);
-            audioRef.current = audio;
-
-            audio.onplay = () => {
-                console.log('✓ Audio playing');
-                setIsPlaying(true);
-            };
-
-            audio.onended = () => {
-                console.log('✓ Podcast audio ended, transitioning to Q&A mode');
-                setIsPlaying(false);
-                setPhase('conversing');
-
-                // Start Q&A session for follow-up questions after podcast
-                startQAMode();
-            };
-
-            audio.onerror = (e) => {
-                console.error('Audio playback error:', e);
-                setIsPlaying(false);
-                setPhase('ended');
-            };
-
-            await audio.play();
-
-        } catch (error) {
-            console.error('Failed to play narration:', error);
-            setTranscript(prev => prev + '\n\n[Audio playback failed. Showing text only.]');
-            setPhase('ended');
-            setIsPlaying(false);
-        }
-    };
-
-    // Start CONVERSATIONAL AGENT MODE (continuous talking + Q&A)
-    const startConversationAgent = async () => {
-        if (hasStartedConversation.current) {
-            console.log('Conversation already started, skipping...');
-            return;
-        }
+    // Start conversation
+    const startConversation = useCallback(async () => {
+        if (hasStarted.current) return;
+        hasStarted.current = true;
 
         const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
 
-        if (!agentId) {
-            console.warn("No agent ID - conversation mode disabled");
-            setTranscript('❌ Conversation mode requires VITE_ELEVENLABS_AGENT_ID in .env.local');
+        if (!agentId || agentId.includes('here') || agentId.length < 10) {
+            setTranscript(`🔧 Setup Required
+
+To use the AI Storyteller, you need an ElevenLabs Agent:
+
+1️⃣ Go to elevenlabs.io/app/conversational-ai
+2️⃣ Create a new Agent
+3️⃣ Copy the Agent ID
+4️⃣ Add to .env.local:
+   VITE_ELEVENLABS_AGENT_ID=your_id
+5️⃣ Restart the app
+
+Current value: ${agentId || 'not set'}`);
             setPhase('ended');
             return;
         }
 
-        hasStartedConversation.current = true;
-
         try {
-            console.log('🤖 Starting Conversational Agent for', location.name);
+            setTranscript(`🔄 Connecting to KAHAANI...
 
-            const firstMessage = `Welcome to ${location.name}, Mumbai! I am Kahaani, your AI storyteller. I'll be sharing fascinating stories about this location and its surroundings. You can interrupt me anytime to ask questions!`;
+📍 Location: ${location.name}
+🎭 Style: ${storyData.preferences?.voiceStyle || 'dramatic'}
+🌐 Language: ${storyData.preferences?.language || 'english'}
+
+Please allow microphone access...`);
+
+            await navigator.mediaDevices.getUserMedia({ audio: true });
 
             await conversation.startSession({
                 agentId,
-                overrides: {
-                    agent: {
-                        firstMessage: firstMessage, // Agent will start talking immediately
-                        prompt: {
-                            prompt: `You are "KAHAANI" - Mumbai's AI storytelling companion with a deep, engaging Indian voice.
-
-LOCATION CONTEXT:
-- Current Location: ${location.name}, Mumbai
-- Coordinates: ${location.lat}, ${location.lng}
-- You are covering this location and all points of interest within a 2km radius
-
-KNOWLEDGE BASE (Research about ${location.name}):
-${storyData.scrapedContent || 'Historical facts about ' + location.name}
-
-POINTS OF INTEREST NEARBY:
-${storyData.pois?.map((p: any) => `- ${p.name} (${p.type})`).join('\n') || 'Gathering POI data...'}
-
-PREFERENCES:
-- Story Mode: ${storyData.preferences?.storyMode || 'both'} (dark=crimes/mysteries, bright=achievements/culture, both=balanced)
-- Time Period: ${storyData.preferences?.dateRange || 'all eras'}
-- Language: ${storyData.preferences?.language || 'English'}
-- Voice Style: ${storyData.preferences?.voiceStyle || 'dramatic'}
-
-YOUR BEHAVIOR:
-1. **Continuous Storytelling**: Keep telling engaging stories about ${location.name} and nearby places
-2. **Interrupt-Friendly**: Stop and answer when user asks questions, then continue storytelling
-3. **Location-Aware**: Focus on the ${location.name} area and 2km radius POIs
-4. **Fact-Based**: Use ONLY verified information from the knowledge base
-5. **Engaging**: Tell stories with vivid details, specific dates, names, and events
-6. **Natural Flow**: Transition smoothly between stories and Q&A
-
-STORYTELLING PATTERN:
-- Start with ${location.name} overview
-- Move through nearby POIs organically
-- Share 2-3 minute stories about each place
-- Include specific facts: dates, names, events
-- Ask rhetorical questions to engage listener
-- Maintain ${storyData.preferences?.voiceStyle || 'dramatic'} tone
-
-WHEN USER ASKS QUESTIONS:
-- Stop current story
-- Answer directly using knowledge base
-- Keep answers concise (30-45 seconds)
-- After answering, ask if they want to hear more or continue the story
-
-STRICT RULES:
-❌ NO made-up facts or speculation
-❌ NO information beyond knowledge base
-✅ ONLY verified historical information
-✅ Keep stories engaging and conversational`
-                        }
-                    }
-                }
+                connectionType: 'webrtc'
             });
 
-            console.log("✓ Conversational Agent started");
-            setTranscript(`🎙️ Live Conversation with KAHAANI\n━━━━━━━━━━━━━━━━━━━━━━\nExploring: ${location.name} + 2km radius\n\n`);
+        } catch (error: any) {
+            console.error('Connection failed:', error);
+            setTranscript(`❌ Connection Failed
 
-        } catch (error) {
-            console.error('Failed to start conversational agent:', error);
-            setTranscript('❌ Failed to start conversation mode. Error: ' + (error as Error).message);
+${error.message}
+
+Check:
+• Agent ID is correct
+• Microphone is enabled
+• ElevenLabs subscription is active`);
             setPhase('ended');
-            hasStartedConversation.current = false;
         }
+    }, [conversation, location.name, storyData.preferences]);
+
+    const handleSend = () => {
+        if (!textInput.trim() || status !== 'connected') return;
+        sendUserMessage(textInput);
+        setTranscript(prev => prev + `\n\n👤 You:\n${textInput}`);
+        setTextInput('');
     };
 
-    // Start Q&A mode after podcast ends
-    const startQAMode = async () => {
-        if (hasStartedConversation.current) return;
-
-        const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
-        if (!agentId) {
-            setTranscript(prev => prev + '\n\n💬 Story complete! (Q&A requires agent ID)');
-            setPhase('ended');
-            return;
-        }
-
-        hasStartedConversation.current = true;
-
-        try {
-            await conversation.startSession({
-                agentId,
-                overrides: {
-                    agent: {
-                        firstMessage: "", // No auto-play for Q&A mode
-                        prompt: {
-                            prompt: `You are "KAHAANI" - Mumbai's storyteller. You just narrated a podcast about ${location.name}.
-
-STORY YOU NARRATED:
-${storyData.script}
-
-KNOWLEDGE BASE:
-${storyData.scrapedContent || 'Historical facts about ' + location.name}
-
-YOUR ROLE: Answer questions about ${location.name} using ONLY the knowledge base above.
-
-RULES:
-- Keep answers brief (2-3 sentences)
-- Reference specific facts from knowledge base
-- If asked about something not in knowledge base: "I don't have verified information about that"
-- Maintain conversational tone`
-                        }
-                    }
-                }
-            });
-
-            setTranscript(prev => prev + '\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n💬 Podcast complete! Ask me questions about ' + location.name + '...');
-        } catch (error) {
-            console.error('Failed to start Q&A:', error);
-        }
+    const handleSave = () => {
+        if (!user?.id) return;
+        const saved = JSON.parse(localStorage.getItem(`stories_${user.id}`) || '[]');
+        saved.push({
+            location: location.name,
+            preferences: storyData.preferences,
+            savedAt: new Date().toISOString()
+        });
+        localStorage.setItem(`stories_${user.id}`, JSON.stringify(saved));
+        setIsSaved(true);
     };
 
     useEffect(() => {
-        let mounted = true;
-
-        if (mounted) {
-            if (isConversationMode) {
-                // Conversation mode: Start conversational agent immediately
-                console.log('🎭 Starting in CONVERSATION mode');
-                startConversationAgent();
-            } else {
-                // Podcast mode: Play TTS narration
-                console.log('🎙️ Starting in PODCAST mode');
-                playNarration();
-            }
-        }
-
-        return () => {
-            mounted = false;
-            // Cleanup audio
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
-                audioRef.current = null;
-            }
-            // End conversation session
-            conversation.endSession();
-        };
-    }, []); // Empty deps array ensures this runs only once
+        startConversation();
+        return () => { conversation.endSession(); };
+    }, []);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -305,63 +174,148 @@ RULES:
         }
     }, [transcript]);
 
+    useEffect(() => {
+        conversation.setVolume({ volume });
+    }, [volume]);
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 100, scale: 0.9 }}
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 100, scale: 0.9 }}
-            className="fixed bottom-6 right-6 z-[1000] w-full max-w-[400px] h-[600px] bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 flex flex-col overflow-hidden font-sans ring-1 ring-black/5"
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            transition={{ type: 'spring', damping: 25 }}
+            className="fixed bottom-6 right-6 z-[1000] w-[420px] h-[680px] rounded-3xl overflow-hidden shadow-2xl"
         >
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-600" />
+            {/* Abstract Gradient Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-950 via-slate-900 to-fuchsia-950" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-rose-500/20 via-transparent to-transparent" />
 
-            <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full bg-black/5 hover:bg-black/10 transition z-10">
-                <X className="text-gray-500 hover:text-black transition-colors" />
-            </button>
+            {/* Animated Orbs */}
+            <div className="absolute top-20 left-10 w-32 h-32 bg-purple-500/30 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-40 right-10 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-fuchsia-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }} />
 
-            <div className="flex flex-col h-full p-6 pt-12">
-                <div className="text-center space-y-1 mb-6">
-                    <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-blue-100/80 border border-blue-200 text-[10px] font-mono text-blue-800 mb-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-blue-600 animate-pulse' : phase === 'conversing' ? 'bg-green-600' : 'bg-gray-400'}`} />
-                        {isConversationMode ? '💬 CONVERSATION' : phase === 'narrating' && isPlaying ? '🎙️ PODCAST' : phase.toUpperCase()}
-                    </div>
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight leading-tight">{location.name}</h2>
-                    <p className="text-slate-500 text-xs tracking-widest uppercase font-medium">
-                        {storyData.preferences?.voiceStyle || 'Dramatic'} • {storyData.preferences?.dateRange || 'All Eras'}
-                        {isConversationMode && ' • Live Agent'}
-                    </p>
-                </div>
+            {/* Content */}
+            <div className="relative z-10 flex flex-col h-full">
 
-                <div className="flex-1 w-full flex flex-col items-center min-h-0 relative">
-                    <div className="scale-75 origin-center -my-4">
-                        <Visualizer isPlaying={isPlaying} />
-                    </div>
-
-                    {/* Transcript Area */}
-                    <div ref={scrollRef} className="w-full mt-4 flex-1 overflow-y-auto px-1 custom-scrollbar text-center">
-                        <p className="text-base text-slate-700 leading-relaxed font-light whitespace-pre-wrap">
-                            {transcript || "Preparing your story..."}
-                        </p>
-                    </div>
-                </div>
-
-                {(phase === 'conversing' || isConversationMode) && (
-                    <div className="mt-4 p-3 bg-linear-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
-                        <div className="flex items-center justify-center gap-2 mb-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <p className="text-sm font-bold text-green-900">
-                                {isConversationMode ? 'LIVE CONVERSATION AGENT' : 'Q&A MODE'}
-                            </p>
+                {/* Header */}
+                <div className="p-5 border-b border-white/10">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-3 h-3 rounded-full ${status === 'connected' ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' :
+                                    phase === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-gray-500'
+                                }`} />
+                            <div>
+                                <h2 className="text-lg font-bold text-white tracking-tight">{location.name}</h2>
+                                <p className="text-xs text-white/60">
+                                    {status === 'connected' ? '🎙️ Live Conversation' :
+                                        phase === 'connecting' ? '⏳ Connecting...' : '📍 Ended'}
+                                </p>
+                            </div>
                         </div>
-                        <p className="text-xs text-green-800 font-medium">
-                            {isConversationMode
-                                ? `🎙️ KAHAANI is telling stories about ${location.name}. Ask questions anytime!`
-                                : `💬 Ask me anything about ${location.name}`}
-                        </p>
-                        <p className="text-[10px] text-green-700 mt-1">
-                            {conversation.status === 'connected' ? '✓ Agent connected' : '⏳ Connecting...'}
-                        </p>
+
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={handleSave}
+                                className={`p-2.5 rounded-xl transition-all ${isSaved
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'}`}
+                            >
+                                <BookmarkPlus size={18} />
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="p-2.5 rounded-xl bg-white/5 text-white/60 hover:bg-red-500/20 hover:text-red-400 transition-all"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
-                )}
+                </div>
+
+                {/* Visualizer */}
+                <div className="flex justify-center py-4">
+                    <div className="relative">
+                        <Visualizer isPlaying={isSpeaking || status === 'connected'} />
+                        {isSpeaking && (
+                            <motion.div
+                                className="absolute -inset-4 rounded-full bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 blur-xl"
+                                animate={{ scale: [1, 1.1, 1] }}
+                                transition={{ repeat: Infinity, duration: 2 }}
+                            />
+                        )}
+                    </div>
+                </div>
+
+                {/* Transcript */}
+                <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 pb-4 scrollbar-thin scrollbar-thumb-white/10">
+                    <div className="text-sm text-white/80 leading-relaxed whitespace-pre-wrap font-light">
+                        {transcript || '🎙️ Initializing KAHAANI...'}
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm">
+                    {/* Status Bar */}
+                    <div className="flex items-center justify-between mb-3 text-xs">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                            <span className="text-white/60">
+                                {status === 'connected' ? 'Connected • Speak naturally' : 'Waiting for connection...'}
+                            </span>
+                        </div>
+                        {isSpeaking && (
+                            <span className="text-cyan-400 animate-pulse">🎙️ Speaking...</span>
+                        )}
+                    </div>
+
+                    {/* Volume Control */}
+                    <div className="flex items-center gap-2 mb-3">
+                        <button onClick={() => setVolume(v => v > 0 ? 0 : 0.8)} className="text-white/60 hover:text-white">
+                            {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                        </button>
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={volume}
+                            onChange={(e) => setVolume(parseFloat(e.target.value))}
+                            className="flex-1 h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-cyan-400"
+                        />
+                    </div>
+
+                    {/* Input */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setIsMuted(!isMuted)}
+                            className={`p-3 rounded-xl transition-all ${isMuted
+                                    ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/50'
+                                    : 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/50'
+                                }`}
+                        >
+                            {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+                        </button>
+
+                        <input
+                            type="text"
+                            value={textInput}
+                            onChange={(e) => setTextInput(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                            placeholder="Type a question..."
+                            className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                        />
+
+                        <button
+                            onClick={handleSend}
+                            disabled={!textInput.trim() || status !== 'connected'}
+                            className="p-3 bg-gradient-to-r from-cyan-500 to-fuchsia-500 hover:from-cyan-400 hover:to-fuchsia-400 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded-xl transition-all shadow-lg shadow-cyan-500/25"
+                        >
+                            <Send size={20} className="text-white" />
+                        </button>
+                    </div>
+                </div>
             </div>
         </motion.div>
     );
