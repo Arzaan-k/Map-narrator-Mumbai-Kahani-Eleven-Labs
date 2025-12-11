@@ -5,7 +5,7 @@ An immersive full-stack application that brings Mumbai's stories to life through
 ## 🌟 Features
 
 - **Interactive Map**: Click anywhere in Mumbai to discover stories within a 2km radius
-- **AI Storytelling**: Powered by Claude 3.5 Sonnet for rich, contextual narratives
+- **AI Storytelling**: Powered by Claude Sonnet 4.5 for rich, contextual narratives
 - **Voice Narration**: ElevenLabs Conversational AI for natural speech and follow-up questions
 - **Real-time Data**: Integrates Overpass API, Nominatim, and Perplexity for location context
 - **Seamless UX**: Beautiful popup player that doesn't interrupt the map experience
@@ -22,10 +22,10 @@ An immersive full-stack application that brings Mumbai's stories to life through
 
 ### Backend
 - **Node.js** + **Express** - API server
-- **Claude 3.5 Sonnet** - Script generation
-- **ElevenLabs** - Voice synthesis & conversation
-- **Perplexity API** - Real-time web research
-- **Overpass API** - Points of interest
+- **Claude Sonnet 4.5** - Advanced script generation
+- **ElevenLabs** - Text-to-Speech + Conversational AI
+- **Perplexity API** - Real-time web research with verified facts
+- **Overpass API** - Points of interest (2km radius)
 - **Nominatim** - Reverse geocoding
 
 ## 📦 Installation
@@ -62,13 +62,18 @@ ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 
 4. **Run the application**
 ```bash
-npm start
+npm run dev
 ```
 
-This will start both the frontend (Vite) and backend (Express) servers concurrently.
-
+This starts both frontend (Vite) and backend (Express) servers concurrently:
 - Frontend: http://localhost:5173
-- Backend: http://localhost:3001
+- Backend API: http://localhost:3001
+
+**Production mode**:
+```bash
+npm run build  # Build frontend
+npm start      # Start production server
+```
 
 ## 🎮 Usage
 
@@ -103,14 +108,30 @@ Map-narrator-Mumbai-Kahani-Eleven-Labs/
 
 ## 🌐 Deployment
 
-### Vercel (Recommended)
+### Render (Recommended)
+
+This app is configured for easy deployment on Render:
 
 1. Push to GitHub
-2. Import project in Vercel
-3. Add environment variables
-4. Deploy!
+2. Create Web Service on [Render](https://render.com)
+3. Connect repository
+4. Add environment variables (see below)
+5. Deploy!
 
-The `vercel.json` configuration handles both frontend and serverless backend deployment.
+**📖 Full deployment guide**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed step-by-step instructions.
+
+### Environment Variables for Production
+
+Add these in Render dashboard:
+
+```bash
+NODE_ENV=production
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+PERPLEXITY_API_KEY=pplx-xxxxx
+VITE_ELEVENLABS_API_KEY=sk_xxxxx
+VITE_ELEVENLABS_AGENT_ID=agent_xxxxx
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxxxx  # Optional
+```
 
 ## 🎨 Customization
 

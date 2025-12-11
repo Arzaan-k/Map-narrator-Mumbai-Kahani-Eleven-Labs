@@ -4,15 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "concurrently \"node server/index.js\" \"vite\"",
-    "dev": "vite",
-    "server": "node server/index.js",
+    "dev": "concurrently \"node server/index.js\" \"vite\"",
+    "dev:client": "vite",
+    "dev:server": "node server/index.js",
     "build": "tsc -b && vite build",
+    "start": "node server/index.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@11labs/react": "^0.2.0",
+    "@clerk/clerk-react": "^5.58.1",
     "@elevenlabs/client": "^0.12.1",
     "@tailwindcss/postcss": "^4.1.17",
     "@tailwindcss/vite": "^4.1.17",
