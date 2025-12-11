@@ -10,10 +10,26 @@ dotenv.config({ path: '.env.local' });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+const isProduction = process.env.NODE_ENV === 'production';
 
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+    origin: isProduction
+        ? true // Allow all origins in production (or specify your Render URL)
+        : ['http://localhost:5173', 'http://localhost:3001'],
+    credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Serve static files in production
+if (isProduction) {
+    const distPath = path.join(__dirname, '../dist');
+    app.use(express.static(distPath));
+    console.log('📦 Serving static files from:', distPath);
+}
 
 // --- HELPER FUNCTIONS ---
 
@@ -132,6 +148,7 @@ async function generateWithClaude(scrapedContent, pois, areaInfo, preferences) {
     const { storyMode, dateRange, voiceStyle, length, language } = preferences;
 
     const languageInstructions = {
+<<<<<<< HEAD
         english: 'Write in pure English.',
         hindi: 'Write in pure Hindi (Devanagari script).',
         marathi: 'Write in pure Marathi (Devanagari script).',
@@ -140,23 +157,63 @@ async function generateWithClaude(scrapedContent, pois, areaInfo, preferences) {
         - Hindi expressions: "suniye", "dekhiye", "arre", "bas", "bilkul", "aur phir"
         - Keep verbs mostly English but add Hindi flavor: "dikha", "hua", "tha", "hai"
         - Example tone: "Dekhiye, yeh jagah bahut famous hai. This place has a long history, jo ki bahut interesting hai."`
+=======
+        english: 'Write in pure English. Natural speech only - NO expression markers like *pauses* or [dramatic].',
+        hindi: 'Write ENTIRELY in Hindi using Devanagari script (देवनागरी). Natural speech only - NO expression markers.',
+        marathi: 'Write ENTIRELY in Marathi using Devanagari script (देवनागरी). Natural speech only - NO expression markers.',
+        hinglish: `Write in Hinglish - a NATURAL mix of Hindi (देवनागरी) and English.
+        
+CRITICAL RULES FOR HINGLISH:
+- Use Hindi words in Devanagari script: यह, वह, बहुत, जगह, कहानी, etc.
+- Mix with English: "यह place बहुत important है"
+- Use Hindi for emotions: दिल, प्यार, डर, खुशी
+- Use Hindi for cultural terms: मंदिर, बाज़ार, चाय, रिक्शा
+- Keep English for modern terms: station, building, police
+- NO expression markers like *pauses* or [whispers]
+- Write EXACTLY how a Mumbaikar speaks naturally
+
+Example: "सुनो, यह Gateway of India सिर्फ एक monument नहीं है। यह Mumbai का दिल है, you know?"
+`
+>>>>>>> 7d403f9f8433679e3c0aa811c074eafcde77130d
     };
 
     const voiceCharacteristics = {
-        dramatic: 'Deep, resonant Indian voice with theatrical pauses. Heavy bass tone.',
-        friendly: 'Warm, conversational Mumbai local voice. Like a friend sharing stories.',
-        documentary: 'Authoritative Indian narrator voice. Clear, precise, factual delivery.',
-        mysterious: 'Low, whispered Indian voice with suspenseful pauses.'
+        dramatic: 'Deep, resonant voice. The AI will add natural pauses and emphasis.',
+        friendly: 'Warm, conversational tone. The AI will sound like a friend.',
+        documentary: 'Authoritative, clear delivery. The AI will maintain professional tone.',
+        mysterious: 'Low, atmospheric voice. The AI will create suspense naturally.'
     };
 
-    const systemPrompt = `You are "KAHAANI" - Mumbai's master storyteller with a deep, heavy-bass Indian voice.
+    const systemPrompt = `You are "KAHAANI" - Mumbai's master storyteller.
 
 VOICE: ${voiceCharacteristics[voiceStyle]}
 LANGUAGE: ${languageInstructions[language]}
 MODE: ${storyMode === 'dark' ? 'Dark/Mysterious' : storyMode === 'bright' ? 'Inspiring' : 'Balanced'}
 TIME: ${dateRange}
 
+<<<<<<< HEAD
 YOUR MISSION: Tell ONE SINGLE, COMPELLING STORY - focus on narrative, not details.
+=======
+CRITICAL RULES:
+1. Use ONLY verified facts from research
+2. Include specific names, dates, locations
+3. NO fiction - only documented facts
+4. Start with powerful hook
+5. Use vivid Mumbai sensory details
+6. Build emotional connection
+7. Write for SPOKEN narration - natural speech patterns
+8. ${language === 'hinglish' || language === 'hindi' || language === 'marathi' ? 'Use Devanagari script for Hindi/Marathi words' : 'Use English'}
+9. NEVER use expression markers like *pauses*, [dramatic], (whispers), etc.
+10. Let the AI voice handle expressions naturally through the text itself
+
+NARRATION STYLE:
+- Short, punchy sentences
+- Natural speech rhythm
+- Vary sentence length
+- Use rhetorical questions
+- Present tense for immediacy
+- NO stage directions or expression markers`;
+>>>>>>> 7d403f9f8433679e3c0aa811c074eafcde77130d
 
 RULES:
 1. Pick THE MOST FAMOUS story from the research
@@ -271,6 +328,7 @@ app.post('/api/generate-script', async (req, res) => {
     }
 });
 
+<<<<<<< HEAD
 // Audio Narration Endpoint with ElevenLabs V3
 app.post('/api/narrate', async (req, res) => {
     try {
@@ -337,4 +395,57 @@ app.listen(PORT, () => {
     console.log('   - PERPLEXITY_API_KEY:', process.env.PERPLEXITY_API_KEY ? '✅ Set' : '❌ Missing');
     console.log('   - ANTHROPIC_API_KEY:', process.env.ANTHROPIC_API_KEY ? '✅ Set' : '❌ Missing');
     console.log('   - ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY ? '✅ Set' : '❌ Missing');
+=======
+// ElevenLabs Conversational AI - Get Signed URL for secure sessions
+app.get('/api/elevenlabs/signed-url', async (req, res) => {
+    try {
+        const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || process.env.VITE_ELEVENLABS_API_KEY;
+        const AGENT_ID = process.env.ELEVENLABS_AGENT_ID || process.env.VITE_ELEVENLABS_AGENT_ID;
+
+        if (!ELEVENLABS_API_KEY || !AGENT_ID) {
+            return res.status(500).json({
+                error: 'Missing ElevenLabs API key or Agent ID',
+                required: ['ELEVENLABS_API_KEY', 'ELEVENLABS_AGENT_ID']
+            });
+        }
+
+        console.log('🔑 Generating signed URL for ElevenLabs agent:', AGENT_ID);
+
+        const response = await fetch(
+            `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${AGENT_ID}`,
+            {
+                headers: {
+                    'xi-api-key': ELEVENLABS_API_KEY
+                }
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('ElevenLabs API error:', errorText);
+            return res.status(response.status).json({ error: 'Failed to get signed URL', details: errorText });
+        }
+
+        const data = await response.json();
+        console.log('✓ Signed URL generated successfully');
+        res.json({ signedUrl: data.signed_url });
+
+    } catch (error) {
+        console.error('Signed URL error:', error);
+        res.status(500).json({ error: 'Failed to generate signed URL' });
+    }
+});
+
+// Catch-all route - must be AFTER API routes
+if (isProduction) {
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, '../dist/index.html'));
+    });
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Mumbai Kahaani Server running on port ${PORT}`);
+    console.log(`📍 Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+    console.log(`🔑 API Keys loaded: ${Object.keys(process.env).filter(k => k.includes('API_KEY')).length}`);
+>>>>>>> 7d403f9f8433679e3c0aa811c074eafcde77130d
 });
