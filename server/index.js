@@ -81,15 +81,17 @@ async function searchLocationInfo(locationName, storyMode, dateRange) {
     const dateContext = dateRange !== 'all' ? `Focus exclusively on the period ${dateRange}. ` : '';
 
     const prompts = {
-        dark: `Research ${locationName}, Mumbai - ONLY VERIFIED FACTS about: crimes, murders, gang wars, mafia activities, scandals, tragedies, ghost stories, accidents, riots, corruption cases. ${dateContext}Include: specific names of criminals/victims, exact dates, police case numbers if available, newspaper references, death tolls, locations of incidents. NO speculation or fiction. Cite sources.`,
+        dark: `Find THE SINGLE MOST FAMOUS AND WELL-KNOWN dark story about ${locationName}, Mumbai. What is the ONE crime, tragedy, ghost story, or incident that this place is MOST famous for? The story that locals know, that appears in news archives, that people search for online. ${dateContext}Include EVERY detail: all names, exact dates, what happened step-by-step, aftermath, why it's remembered. Make this ONE story comprehensive and detailed. Cite sources.`,
 
-        bright: `Research ${locationName}, Mumbai - ONLY VERIFIED FACTS about: historical achievements, cultural landmarks, famous personalities who lived/worked there, architectural heritage, independence movement activities, social reforms, economic development, festivals, art movements. ${dateContext}Include: specific names, exact dates, building names, achievement details, awards, historical significance. NO speculation. Cite sources.`,
+        bright: `Find THE SINGLE MOST FAMOUS AND CELEBRATED story about ${locationName}, Mumbai. What is the ONE achievement, landmark, famous person, or historical event that this place is MOST known for? The story that defines this location, that tourists want to hear. ${dateContext}Include EVERY detail: all names, exact dates, significance, impact, why it's famous, interesting facts. Make this ONE story comprehensive and detailed. Cite sources.`,
 
-        both: `Research ${locationName}, Mumbai - COMPREHENSIVE FACTUAL HISTORY covering BOTH:
-        1. DARK SIDE: Verified crimes, tragedies, scandals, riots, accidents with specific names, dates, case details
-        2. BRIGHT SIDE: Verified achievements, heritage, famous residents, cultural significance, development milestones
+        both: `Find THE SINGLE MOST FAMOUS AND POPULAR story about ${locationName}, Mumbai. What is this place BEST KNOWN FOR? The ONE story that:
+        - Appears most in searches and guidebooks
+        - Locals tell visitors about
+        - Defines this location's identity
+        - Has the most historical documentation
         ${dateContext}
-        For EACH fact: provide specific names, exact dates, locations, and source references. Balance both aspects equally. NO fiction or speculation. Only documented historical facts.`,
+        Provide COMPLETE, DETAILED information about this ONE story: all names, exact dates, complete sequence of events, significance, impact, and why it remains famous today. Focus on DEPTH, not breadth. Cite all sources.`,
     };
 
     try {
@@ -103,12 +105,12 @@ async function searchLocationInfo(locationName, storyMode, dateRange) {
                 model: 'llama-3.1-sonar-large-128k-online',
                 messages: [{
                     role: 'system',
-                    content: 'You are a historical researcher. Provide ONLY verified, factual information with specific dates, names, and sources. No speculation or creative writing.'
+                    content: 'You are a historical researcher. Find THE SINGLE MOST FAMOUS story about the location. Provide ONLY verified, factual information with specific dates, names, and sources. Focus on the ONE story this place is best known for.'
                 }, {
                     role: 'user',
                     content: prompts[storyMode] || prompts.both
                 }],
-                max_tokens: 3000,
+                max_tokens: 4000,
                 temperature: 0.2, // Low temperature for factual accuracy
             }),
         });
@@ -133,7 +135,11 @@ async function generateWithClaude(scrapedContent, pois, areaInfo, preferences) {
         english: 'Write in pure English.',
         hindi: 'Write in pure Hindi (Devanagari script).',
         marathi: 'Write in pure Marathi (Devanagari script).',
-        hinglish: 'Write in Hinglish - natural mix of Hindi and English as spoken in Mumbai.'
+        hinglish: `Write in NATURAL HINGLISH - authentic Mumbai street language mixing Hindi and English:
+        - Use Hindi words naturally: yahan, wahan, kya, kaise, bahut, bada, purana, famous, khaas
+        - Hindi expressions: "suniye", "dekhiye", "arre", "bas", "bilkul", "aur phir"
+        - Keep verbs mostly English but add Hindi flavor: "dikha", "hua", "tha", "hai"
+        - Example tone: "Dekhiye, yeh jagah bahut famous hai. This place has a long history, jo ki bahut interesting hai."`
     };
 
     const voiceCharacteristics = {
@@ -150,25 +156,38 @@ LANGUAGE: ${languageInstructions[language]}
 MODE: ${storyMode === 'dark' ? 'Dark/Mysterious' : storyMode === 'bright' ? 'Inspiring' : 'Balanced'}
 TIME: ${dateRange}
 
-RULES:
-1. Use ONLY verified facts from research
-2. Include specific names, dates, locations
-3. NO fiction - only documented facts
-4. Start with powerful hook
-5. Use vivid Mumbai sensory details
-6. Build emotional connection
-7. Write for SPOKEN narration
-8. Add Hinglish expressions if language is hinglish`;
+YOUR MISSION: Tell ONE SINGLE, COMPELLING STORY - focus on narrative, not details.
 
-    const userPrompt = `Create ultra-realistic narration about ${areaInfo.neighborhood}, Mumbai.
+RULES:
+1. Pick THE MOST FAMOUS story from the research
+2. Tell it as an ENGAGING NARRATIVE - beginning, middle, end
+3. Mention ONLY the most important names (2-3 key people maximum)
+4. Skip minor details - focus on the STORY and EMOTION
+5. Make it 2-3 minutes of narration (400-600 words)
+6. Start with a powerful hook that draws listeners in
+7. Build tension and drama throughout
+8. Use vivid Mumbai sensory details (sounds, sights, atmosphere)
+9. Write for natural SPOKEN narration like telling a friend
+10. End with emotional impact or significance
+11. Use Hinglish naturally - mix Hindi words smoothly`;
+
+    const userPrompt = `Create ONE detailed, immersive narrative story about ${areaInfo.neighborhood}, Mumbai.
 
 TIME PERIOD: ${dateRange}
-POIs: ${pois.map(p => p.name).join(', ')}
+NEARBY LANDMARKS: ${pois.map(p => p.name).join(', ')}
 
-VERIFIED RESEARCH:
+RESEARCH ABOUT THE MOST FAMOUS STORY:
 ${scrapedContent}
 
-Use ONLY facts above. Include names and dates. Make it powerful for heavy Indian voice.`;
+INSTRUCTIONS:
+- Choose the SINGLE MOST FAMOUS/POPULAR story from the research above
+- Tell it as an ENGAGING NARRATIVE focused on the story, not listing facts
+- Mention ONLY 2-3 most important names (main characters/people)
+- Skip minor dates and details - focus on DRAMA and EMOTION
+- Make it conversational and gripping
+- Length: 2-3 minutes when spoken (400-600 words)
+- Write as if telling a fascinating story to a friend standing next to you
+- Use natural Hinglish - sprinkle Hindi words throughout`;
 
     try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -180,7 +199,7 @@ Use ONLY facts above. Include names and dates. Make it powerful for heavy Indian
             },
             body: JSON.stringify({
                 model: 'claude-sonnet-4-5-20250929',
-                max_tokens: 3000,
+                max_tokens: 4096,
                 temperature: 0.7,
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userPrompt }],
@@ -194,7 +213,16 @@ Use ONLY facts above. Include names and dates. Make it powerful for heavy Indian
             return `Story generation error: ${data.error?.message || 'Unknown error'}`;
         }
 
-        return data.content?.[0]?.text || 'Failed to generate script via Claude (Empty response).';
+        const script = data.content?.[0]?.text || 'Failed to generate script via Claude (Empty response).';
+        
+        // Print the generated story in terminal
+        console.log('\n' + '═'.repeat(80));
+        console.log('📖 GENERATED STORY:');
+        console.log('═'.repeat(80));
+        console.log(script);
+        console.log('═'.repeat(80) + '\n');
+        
+        return script;
     } catch (error) {
         console.error('Claude API Request Failed:', error);
         return 'Critical error generating script.';
@@ -243,6 +271,70 @@ app.post('/api/generate-script', async (req, res) => {
     }
 });
 
+// Audio Narration Endpoint with ElevenLabs V3
+app.post('/api/narrate', async (req, res) => {
+    try {
+        console.log('🎙️ [NARRATE] Request received');
+        const { text, voiceId = 'EsGA6YZzJKyddqvfyQ26' } = req.body; // Kartik voice - natural Indian voice
+        
+        if (!text) {
+            console.error('❌ [NARRATE] No text provided in request');
+            return res.status(400).json({ error: 'Text is required' });
+        }
+        
+        console.log('🎙️ [NARRATE] Text length:', text.length, 'Voice ID:', voiceId);
+        
+        if (!process.env.ELEVENLABS_API_KEY) {
+            console.error('❌ [NARRATE] ElevenLabs API Key missing');
+            return res.status(500).json({ error: 'ElevenLabs API key not configured' });
+        }
+        
+        console.log('🎙️ [NARRATE] Calling ElevenLabs API with V3 model...');
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+            method: 'POST',
+            headers: {
+                'xi-api-key': process.env.ELEVENLABS_API_KEY,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text,
+                model_id: 'eleven_turbo_v2_5', // Latest V3 model - more natural, supports multilingual
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.75,
+                    style: 0.5, // V3 feature for more expressive speech
+                    use_speaker_boost: true // V3 feature for clarity
+                }
+            }),
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ [NARRATE] ElevenLabs API error:', response.status, errorText);
+            throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+        }
+        
+        console.log('✅ [NARRATE] Audio generated successfully with V3 model');
+        const audioBuffer = await response.arrayBuffer();
+        console.log('✅ [NARRATE] Audio buffer size:', audioBuffer.byteLength, 'bytes');
+        
+        res.set('Content-Type', 'audio/mpeg');
+        res.send(Buffer.from(audioBuffer));
+    } catch (error) {
+        console.error('❌ [NARRATE] Error:', error);
+        res.status(500).json({ error: 'Failed to generate audio: ' + error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 Mumbai Kahaani Server running on http://localhost:${PORT}`);
+    console.log('📋 Available endpoints:');
+    console.log('   - POST /api/gather-data');
+    console.log('   - POST /api/generate-script');
+    console.log('   - POST /api/narrate (V3 Model)');
+    console.log('');
+    console.log('🔑 Environment variables check:');
+    console.log('   - PERPLEXITY_API_KEY:', process.env.PERPLEXITY_API_KEY ? '✅ Set' : '❌ Missing');
+    console.log('   - ANTHROPIC_API_KEY:', process.env.ANTHROPIC_API_KEY ? '✅ Set' : '❌ Missing');
+    console.log('   - ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY ? '✅ Set' : '❌ Missing');
 });

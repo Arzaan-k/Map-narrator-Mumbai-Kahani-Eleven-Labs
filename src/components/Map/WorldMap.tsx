@@ -18,10 +18,7 @@ interface WorldMapProps {
     selectedId?: string;
 }
 
-const MUMBAI_BOUNDS: [number, number][] = [
-    [18.89, 72.77], // Southwest
-    [19.27, 73.00], // Northeast
-];
+
 
 function MapController({ onMapClick }: { onMapClick: (e: any) => void }) {
     useMapEvents({
@@ -34,31 +31,27 @@ function MapController({ onMapClick }: { onMapClick: (e: any) => void }) {
 
 export default function WorldMap({ locations, onSelect, selectedId }: WorldMapProps) {
     const handleMapClick = (e: any) => {
-        // Reverse geocode or just pass coords. 
-        // For professional feel, we'll try to find nearest location or create a new temporary one.
         onSelect({
             id: `temp-${Date.now()}`,
-            name: "Selected Location",
+            name: "New Location",
             lat: e.latlng.lat,
             lng: e.latlng.lng,
-            description: "Custom Selection"
+            description: "Custom Point"
         });
     };
 
     return (
-        <div className="h-full w-full rounded-xl overflow-hidden shadow-2xl border border-white/10 relative font-sans group">
+        <div className="h-full w-full overflow-hidden relative font-sans group">
             <MapContainer
                 center={[19.0760, 72.8777]}
-                zoom={11}
-                minZoom={10}
-                maxBounds={MUMBAI_BOUNDS}
+                zoom={13}
+                minZoom={12}
                 scrollWheelZoom={true}
-                className="h-full w-full bg-[#cbd5e1] z-0"
+                className="h-full w-full z-0"
             >
                 <MapController onMapClick={handleMapClick} />
-                {/* Using CartoDB Positron for light theme */}
                 <TileLayer
-                    attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    attribution='&copy; CARTO'
                     url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                 />
                 {locations.map(loc => (
@@ -66,49 +59,54 @@ export default function WorldMap({ locations, onSelect, selectedId }: WorldMapPr
                         key={loc.id}
                         position={[loc.lat, loc.lng]}
                         icon={customIcon}
-                        eventHandlers={{
-                            click: () => onSelect(loc),
-                        }}
+                        eventHandlers={{ click: () => onSelect(loc) }}
                     >
-                        <Popup className="text-black font-medium">
-                            <div className="font-bold text-base">{loc.name}</div>
-                            <div className="text-sm opacity-80">{loc.description}</div>
+                        <Popup className="text-slate-800 font-sans">
+                            <div className="font-bold text-lg">{loc.name}</div>
+                            <div className="text-base text-slate-600">{loc.description}</div>
                         </Popup>
                     </Marker>
                 ))}
             </MapContainer>
 
-            {/* Glassmorphic Sidebar */}
-            <div className="absolute top-4 left-4 z-[400] bg-white/60 backdrop-blur-xl p-4 rounded-2xl border border-black/5 max-h-[calc(100vh-2rem)] overflow-y-auto w-72 shadow-xl">
-                <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">🇮🇳 Mumbai Kahaani</h2>
-                    <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider">Voices of the City</p>
+            {/* Premium Glass Sidebar */}
+            <div className="absolute top-6 left-6 z-[400] glass-panel p-6 rounded-3xl h-auto max-h-[85vh] overflow-y-auto w-[440px] shadow-2xl ring-1 ring-black/5 transition-all">
+                <div className="mb-8">
+                    <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
+                        Mumbai Kahaani
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-2 font-medium tracking-wide uppercase">
+                        Interactive Storytelling Map
+                    </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {locations.map(loc => (
                         <button
                             key={loc.id}
                             onClick={() => onSelect(loc)}
-                            className={`w-full text-left p-3 rounded-lg transition-all duration-300 group
+                            className={`w-full text-left p-4 rounded-xl transition-all duration-300 group border text-base relative overflow-hidden
                   ${selectedId === loc.id
-                                    ? 'bg-blue-600 shadow-md text-white'
-                                    : 'hover:bg-black/5 border border-transparent'}`}
+                                    ? 'bg-blue-600 border-blue-500 shadow-blue-500/30 shadow-lg text-white'
+                                    : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-blue-300 text-slate-700'}`}
                         >
-                            <div className="flex justify-between items-center">
-                                <div className={`font-semibold transition-colors ${selectedId === loc.id ? 'text-white' : 'text-slate-700 group-hover:text-slate-900'}`}>
-                                    {loc.name}
+                            <div className="relative z-10">
+                                <div className="flex justify-between items-center mb-1">
+                                    <div className={`font-bold text-lg ${selectedId === loc.id ? 'text-white' : 'text-slate-800'}`}>
+                                        {loc.name}
+                                    </div>
                                 </div>
-                                {selectedId === loc.id && <span className="text-xs text-blue-200">●</span>}
+                                <div className={`text-sm leading-relaxed ${selectedId === loc.id ? 'text-blue-100' : 'text-slate-500'}`}>
+                                    {loc.description}
+                                </div>
                             </div>
-                            <div className={`text-xs mt-1 ${selectedId === loc.id ? 'text-blue-100' : 'text-slate-500'}`}>{loc.description}</div>
                         </button>
                     ))}
                 </div>
             </div>
 
-            <div className="absolute bottom-4 right-4 z-[400] bg-white/60 backdrop-blur px-3 py-1 rounded-full text-xs text-slate-500 border border-black/5">
-                11.x Hackathon Build
+            <div className="absolute bottom-6 right-6 z-[400] bg-white/90 backdrop-blur px-4 py-2 rounded-full text-sm font-medium text-slate-500 shadow-lg border border-white/50">
+                Map Narrator v1.0
             </div>
         </div>
     );

@@ -32,7 +32,7 @@ function App() {
   };
 
   return (
-    <div className="w-screen h-screen bg-slate-50 text-slate-900 overflow-hidden relative selection:bg-cyan-500/30">
+    <div className="w-screen h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-white text-slate-900 overflow-hidden relative selection:bg-indigo-500/30">
       <WorldMap
         locations={LOCATIONS}
         onSelect={handleLocationSelect}
@@ -61,9 +61,9 @@ function App() {
       )}
 
       {error && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-950/90 border border-red-500/50 text-red-200 px-6 py-4 rounded-xl backdrop-blur-xl z-[700] shadow-2xl flex items-center gap-4">
-          <span>{error}</span>
-          <button onClick={reset} className="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 rounded transition-colors text-xs uppercase font-bold tracking-wider">Dismiss</button>
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/90 border border-red-200 text-red-700 px-8 py-4 rounded-2xl backdrop-blur-xl z-[700] shadow-2xl flex items-center gap-4 ring-1 ring-red-100">
+          <span className="font-medium">{error}</span>
+          <button onClick={reset} className="px-4 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors text-xs uppercase font-bold tracking-wider">Dismiss</button>
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@
 // In a real Next.js app, this would be `api/narrate.ts`
 // import { Location } from '../data/locations';
 
-export async function narrateText(text: string, voiceId: string = "21m00Tcm4TlvDq8ikWAM") {
+export async function narrateText(text: string, voiceId: string = "EsGA6YZzJKyddqvfyQ26") { // Kartik voice
     const apiKey = import.meta.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
         console.warn("ElevenLabs API Key missing");

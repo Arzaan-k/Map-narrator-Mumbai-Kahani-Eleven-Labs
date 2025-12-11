@@ -42,11 +42,11 @@ export async function generateScript(data: any, preferences: any) {
     return response.json();
 }
 
-export async function generateAudio(text: string): Promise<Blob> {
+export async function generateAudio(text: string, voiceId: string = 'EsGA6YZzJKyddqvfyQ26'): Promise<Blob> {
     const response = await fetch('http://localhost:3001/api/narrate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, voiceId }) // Send Kartik voice ID
     });
 
     if (!response.ok) throw new Error("Failed to generate audio");

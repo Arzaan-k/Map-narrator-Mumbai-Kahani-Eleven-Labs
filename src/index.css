@@ -1,10 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  --background: 210 40% 98%;
+  --foreground: 222.2 47.4% 11.2%; /* Slate 900, not black */
+  --primary: 221.2 83.2% 53.3%;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-gradient-to-br from-indigo-50 via-slate-50 to-white text-slate-900 antialiased;
+  font-size: 16px; /* Base font size increase */
+}
+
+.glass-panel {
+  @apply bg-white/80 backdrop-blur-2xl border border-white/40 shadow-xl;
 }

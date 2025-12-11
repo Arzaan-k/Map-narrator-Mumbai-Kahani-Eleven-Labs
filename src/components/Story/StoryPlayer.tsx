@@ -17,23 +17,47 @@ export default function StoryPlayer({ location, storyData, onClose }: StoryPlaye
     const scrollRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    // Log environment variables on mount
+    console.log('🔧 [INIT] Environment check:', {
+        hasElevenLabsApiKey: !!import.meta.env.VITE_ELEVENLABS_API_KEY,
+        hasAgentId: !!import.meta.env.VITE_ELEVENLABS_AGENT_ID,
+        agentId: import.meta.env.VITE_ELEVENLABS_AGENT_ID
+    });
+
     // ElevenLabs Conversational AI hook (for follow-up questions)
     const conversation = useConversation({
         onConnect: () => {
-            console.log('✓ Connected to ElevenLabs Conversational AI');
+            console.log('✅ [CONVERSATION] Successfully connected to ElevenLabs Conversational AI');
+            console.log('✅ [CONVERSATION] WebRTC connection established');
         },
         onDisconnect: () => {
-            console.log('Disconnected from ElevenLabs');
+            console.log('⚠️ [CONVERSATION] Disconnected from ElevenLabs');
         },
         onMessage: (message: any) => {
-            console.log('Conversation message:', message);
+            console.log('📩 [CONVERSATION] Message received:', {
+                type: typeof message,
+                hasMessage: !!message?.message,
+                hasText: !!message?.text,
+                message: message
+            });
+            
             const text = message?.message || message?.text || '';
-            if (text && phase === 'conversing') {
-                setTranscript(prev => prev + '\n\n' + text);
+            if (text) {
+                console.log('📩 [CONVERSATION] Extracted text:', text);
+                if (phase === 'conversing') {
+                    setTranscript(prev => prev + '\n\n🤖 ' + text);
+                }
+            } else {
+                console.warn('⚠️ [CONVERSATION] Received message but no text found');
             }
         },
         onError: (error: any) => {
-            console.error('ElevenLabs conversation error:', error);
+            console.error('❌ [CONVERSATION] Error occurred');
+            console.error('❌ [CONVERSATION] Error details:', {
+                type: error?.constructor?.name,
+                message: error?.message,
+                error: error
+            });
         },
     });
 
@@ -113,16 +137,23 @@ export default function StoryPlayer({ location, storyData, onClose }: StoryPlaye
 
     // Start conversation mode for follow-up questions
     const startConversationMode = async () => {
+        console.log('\n🔵 [CONVERSATION] Starting conversation mode...');
+        
         const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
+        console.log('🔵 [CONVERSATION] Agent ID:', agentId ? `Found (${agentId})` : 'MISSING');
 
         if (!agentId) {
-            console.warn("No agent ID - conversation mode disabled");
+            console.error('❌ [CONVERSATION] No agent ID configured in environment');
+            console.error('❌ [CONVERSATION] Set VITE_ELEVENLABS_AGENT_ID in .env file');
+            setTranscript(prev => prev + '\n\n❌ Conversation mode disabled - Agent ID not configured.');
             return;
         }
 
         try {
-            await conversation.startSession({
-                agentId,
+            console.log('🔵 [CONVERSATION] Preparing session config...');
+            const sessionConfig = {
+                agentId: String(agentId),
+                connectionType: 'webrtc' as const,
                 overrides: {
                     agent: {
                         prompt: {
@@ -146,13 +177,29 @@ RULES:
                         }
                     }
                 }
-            });
+            };
+            
+            console.log('🔵 [CONVERSATION] Session config:', JSON.stringify({
+                agentId: sessionConfig.agentId,
+                connectionType: sessionConfig.connectionType,
+                hasOverrides: !!sessionConfig.overrides
+            }, null, 2));
 
-            console.log("✓ Conversation mode ready");
+            console.log('🔵 [CONVERSATION] Calling conversation.startSession...');
+            await conversation.startSession(sessionConfig);
+
+            console.log('✅ [CONVERSATION] Session started successfully!');
+            console.log('✅ [CONVERSATION] Conversation mode ready');
             setTranscript(prev => prev + '\n\n🎙️ You can now ask me questions about ' + location.name + '!');
 
-        } catch (error) {
-            console.error('Failed to start conversation:', error);
+        } catch (error: any) {
+            console.error('❌ [CONVERSATION] Failed to start conversation');
+            console.error('❌ [CONVERSATION] Error type:', error?.constructor?.name);
+            console.error('❌ [CONVERSATION] Error message:', error?.message);
+            console.error('❌ [CONVERSATION] Full error:', error);
+            console.error('❌ [CONVERSATION] Error stack:', error?.stack);
+            
+            setTranscript(prev => prev + '\n\n❌ Conversation mode failed to start. Check console logs.');
         }
     };
 
@@ -181,43 +228,43 @@ RULES:
             initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.9 }}
-            className="fixed bottom-6 right-6 z-[1000] w-full max-w-[400px] h-[600px] bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 flex flex-col overflow-hidden font-sans ring-1 ring-black/5"
+            className="fixed bottom-8 right-8 z-[1000] w-full max-w-[500px] h-[75vh] max-h-[850px] bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl border border-white/60 flex flex-col overflow-hidden font-sans ring-1 ring-black/5"
         >
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-600" />
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-600" />
 
-            <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full bg-black/5 hover:bg-black/10 transition z-10">
-                <X className="text-gray-500 hover:text-black transition-colors" />
+            <button onClick={onClose} className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition z-10 border border-slate-200">
+                <X size={20} />
             </button>
 
-            <div className="flex flex-col h-full p-6 pt-12">
-                <div className="text-center space-y-1 mb-6">
-                    <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-blue-100/80 border border-blue-200 text-[10px] font-mono text-blue-800 mb-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-blue-600 animate-pulse' : phase === 'conversing' ? 'bg-green-600' : 'bg-gray-400'}`} />
-                        {phase === 'narrating' && isPlaying ? 'PLAYING' : phase.toUpperCase()}
+            <div className="flex flex-col h-full p-8 pt-14">
+                <div className="text-center space-y-2 mb-8">
+                    <div className="inline-flex items-center gap-2.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-bold font-mono text-indigo-700 mb-2 shadow-sm">
+                        <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-indigo-600 animate-pulse' : phase === 'conversing' ? 'bg-green-500' : 'bg-slate-400'}`} />
+                        {phase === 'narrating' && isPlaying ? 'PLAYING NOW' : phase.toUpperCase()}
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight leading-tight">{location.name}</h2>
-                    <p className="text-slate-500 text-xs tracking-widest uppercase font-medium">
+                    <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight leading-tight">{location.name}</h2>
+                    <p className="text-slate-500 text-sm tracking-widest uppercase font-semibold">
                         {storyData.preferences?.voiceStyle || 'Dramatic'} • {storyData.preferences?.dateRange || 'All Eras'}
                     </p>
                 </div>
 
                 <div className="flex-1 w-full flex flex-col items-center min-h-0 relative">
-                    <div className="scale-75 origin-center -my-4">
+                    <div className="scale-90 origin-center -my-2 opacity-90">
                         <Visualizer isPlaying={isPlaying} />
                     </div>
 
-                    {/* Transcript Area */}
-                    <div ref={scrollRef} className="w-full mt-4 flex-1 overflow-y-auto px-1 custom-scrollbar text-center">
-                        <p className="text-base text-slate-700 leading-relaxed font-light whitespace-pre-wrap">
+                    {/* Transcript Area - Larger Font */}
+                    <div ref={scrollRef} className="w-full mt-6 flex-1 overflow-y-auto px-2 custom-scrollbar text-center mask-linear-fade">
+                        <p className="text-xl text-slate-700 leading-relaxed font-normal whitespace-pre-wrap font-sans">
                             {transcript || "Preparing your story..."}
                         </p>
                     </div>
                 </div>
 
                 {phase === 'conversing' && (
-                    <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg text-center">
-                        <p className="text-sm font-medium text-blue-900">🎙️ Ask me anything about {location.name}!</p>
-                        <p className="text-xs text-blue-700 mt-1">Use your microphone to ask questions</p>
+                    <div className="mt-6 p-4 bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl text-center shadow-inner">
+                        <p className="text-base font-bold text-indigo-900">🎙️ Ask me anything about {location.name}!</p>
+                        <p className="text-sm text-indigo-600 mt-1 font-medium">Use your microphone to ask questions</p>
                     </div>
                 )}
             </div>
